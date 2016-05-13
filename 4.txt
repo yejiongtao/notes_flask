@@ -1,0 +1,117 @@
+1. redirect and user sessions	(checkout 4b)
+	why Post/Redirect/Get
+		when user presses submit with invalid inputs, POST will not be sent
+		when pressing submit with valid inputs, POST will be sent
+			after this, if refreshing the page, there will be a warning
+			because refreshing is actually resending the last request, which is POST
+				and in almost all cases, a duplicate form submission is not a desired action
+		to avoid this, we redirect the POST request to a GET request
+			so, the last request the browser sends will never be a POST
+	why user sessions
+		the data in the request context becomes invalid once the the request comes to an end
+			so the second when responding the second GET request, we cannot access the first POST request's form data
+		to fix this, we need user sessions, which can survive across requests
+	using them
+		from flask import Flask, render_template, session, redirect, url_for
+
+		@app.route('/', methods=['GET', 'POST'])
+		def index():
+		    form = NameForm()
+		    if form.validate_on_submit():
+			session['name'] = form.name.data	# session context is like dictionary
+			return redirect(url_for('index'))	# use url_for() instead of directly using the path '/', to make it easier to maintain
+		    return render_template('index.html', form=form, name=session.get('name'))
+
+2. message flashing	(checkout 4c)
+	sometimes you will have to give the user a status update after a request is completed
+		for example, to tell him the username and the password do not match
+	flash() can be used, which is included in Flask's core featrue
+		import and use flash() somewhere in the view function
+			flash('Hey! Username and password do not match!')
+		give it a place to render in the template
+			{% for message in get_flashed_messages() %}		# messages retrieved will not be returned next time
+			    <div class="alert alert-warning">			# so flashed messages appear only once and are then discarded
+				<button type="button" class="close" data-dismiss="alert">&times;</button>	# the close button
+				{{ message }}
+			    </div>
+			{% endfor %}						
+
+3. NoSQL databases, in contrast of relational database
+	usually use collections instead of tables, documents instead of records
+		joins become difficult, and usually not supported
+	SQL or NoSQL?
+		SQL databases store data in an efficient and compact way, and good at preserving consistensy
+		NoSQL databases relax some of the consistensy requirements, but sometimes can be better at performance
+	For small- to medium-size applications, both SQL and NoSQL databases are perfectly capable
+
+4. Python database framework
+	database engines
+		Python has packages for most database engines, and Flask puts no restrictions on what to use
+	database abstraction layers, such as SQLAlchemy or MongoEngine
+		also called object-relational mappers (ORMs) or object-document mappers (ODMs)
+			translate from the object domain into the database domain 
+		allow you to work at a higher level with regular Python objects instead of database entities
+		SQLAlchemy ORM
+			supports a list of relational database engines including the popular MySQL, Postgres, and SQLite
+			and also provides low level access to the database's native SQL functionality
+
+5. Flask-SQLAlchemy	--a flask extension wrapper of SQLAlchemy
+	a database is specified as a URL
+		MySQL		mysql://username:password@hostname/database
+		Postgres	postgresql://username:password@hostname/database
+		SQLite (Unix)	sqlite:////absolute/path/to/database
+		SQLite (Windows)sqlite:///c:/absolute/path/to/database
+	database configuration
+		from flask.ext.sqlalchemy import SQLAlchemy
+
+		basedir = os.path.abspath(os.path.dirname(__file__))
+
+		app = Flask(__name__)
+		app.config['SQLALCHEMY_DATABASE_URI'] =\	# The URL of the application database must be configured as the key SQLALCHEMY_DATABASE_URI
+		    'sqlite:///' + os.path.join(basedir, 'data.sqlite')
+		app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True	# this configuration enables automatic commits of database changes at the end of each request
+
+		db = SQLAlchemy(app)				# represents the database and provides access to all the functionality of Flask-SQLAlchemy
+	model definition
+		class User(db.Model):
+		    __tablename__ = 'users'			# defines the name of the table in the database
+								# table names are better to be plurals
+		    id = db.Column(db.Integer, primary_key=True)	# attributes of the model, defined as instances of the db.Column class
+									# Flask-SQLAlchemy requires all models to define a primary key column, which is normally named id
+									# and it's managed by Flask-SQLAlchemy
+		    username = db.Column(db.String(64), unique=True, index=True)
+
+		    def __repr__(self):				# not strictly necessary, just give a readable string representation that can be used for debugging
+			return '<User %r>' % self.username
+	relationships
+
+
+	database operations
+
+6. SQLAlchemy column types, and the Python type used in the model
+	Integer		int			Regular integer, typically 32 bits
+	SmallInteger	int			Short-range integer, typically 16 bits
+	BigInteger	int or long		Unlimited precision integer
+	Float		float			Floating-point number
+	Numeric		decimal.Decimal		Fixed-point number
+	String		str			Variable-length string
+	Text		str			Variable-length string, optimized for large or unbound length
+	Unicode		unicode			Variable-length Unicode string
+	UnicodeText	unicode			Variable-length Unicode string, optimized for large or unbound length
+	Boolean		bool			Boolean value
+	Date		datetime.date		Date value
+	Time		datetime.time		Time value
+	DateTime	datetime.datetime	Date and time value
+	Interval	datetime.timedelta	Time interval
+	Enum		str			List of string values
+	PickleType	Any Python object	Automatic Pickle serialization
+	LargeBinary	str			Binary blob
+Most common SQLAlchemy column options
+	primary_key	If set to True, the column is the table’s primary key.
+	unique		If set to True, do not allow duplicate values for this column.
+	index		If set to True, create an index for this column, so that queries are more efficient.
+	nullable	If set to True, allow empty values for this column. If set to False, the column will not allow null values.
+	default		Define a default value for the column.
+
+
+

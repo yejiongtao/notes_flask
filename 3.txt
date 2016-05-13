@@ -1,0 +1,139 @@
+1. custom error pages	(checkout 3c)
+	Flask allows an application to define custom error pages that can be based on templates, like regular routes
+	two most common error codes
+		404, triggered when the client requests a page or route that is not known
+		500, triggered when there is an unhandled exception
+	using decorator @app.errorhandler()
+		@app.errorhandler(404)
+		def page_not_found(e):
+		    return render_template('404.html'), 404
+
+		@app.errorhandler(500)
+		def internal_server_error(e):
+		    return render_template('500.html'), 500
+
+2. links
+	hard-code the URLs of the link in the template is hard to maintain
+		If the routes are reorganized, links in templates may break
+	instead, we attach the link with the view functions
+		and use url_for() to get the url dynamically
+	using url_for in the template
+		<link href="{{ url_for('index') }}">
+	different forms
+		url_for('index')			returns /
+		url_for('index', _external=True)	returns an absolute url, i.e., http://localhost:5000/
+			Absolute URLs are necessary only for links that will be used outside of the web browser, such as when sending links by email
+		url_for('user', name='john', _external=True)
+			with arguments
+		url_for('index', page=2)
+			with extra arguments, which will return /?page=2
+
+3. static files		(checkout 3d)
+	such as images, Javascript source files, CSS, etc
+	store in static folder
+	access them using url_for('static', filename = 'favicon.ico')
+		references to static files are treated as a special route defined as /static/<filename>
+
+4. localization of dates and times with flask-moment
+	an extension for Flask of moment.js, a client-side open source library writtem in JavaScript that renders dates and times in the browser
+	to use it 
+		flask-moment depends on jquery.js and moment.js, these libraries need to be included in the HTML documents
+			jquery.js is already included by Bootstrap
+			to include moment.js, in templates/base.html
+				{% block scripts %}
+				{{ super() }}
+				{{ moment.include_moment() }}
+				{% endblock %}
+		use time in templates
+			<p>The local date and time is {{ moment(current_time).format('LLL') }}.</p>
+			<p>That was {{ moment(current_time).fromNow(refresh=True) }}</p>
+		pass the time to the template in the code
+			from datetime import datetime
+			from flask.ext.moment import Moment
+			moment = Moment(app)
+			# ...
+
+			@app.route('/')
+			def index():
+			    return render_template('index.html',
+						   current_time=datetime.utcnow())
+		use different languages to localize the timestamp
+			{{ moment.lang('es') }}
+
+5. web forms	(checkout 4a)
+	all the information sent by the client was exposed by a request
+		request.form provides access to form data submitted in POST requests
+	however, using an extension can make things about forms much more easier
+	Flask-WTF
+		a flask integration wrapper around the framework-agnostic WTForms package
+	Flask-WTF protects all forms against CSRF
+		it requires an encrption key to be configured
+			Flask-WTF uses this key to generate encrypted tokens that are used to verify the authenticity of requests with form data
+		code
+			app.config['SECRET_KEY'] = 'hard to guess string'
+			# The app.config dictionary is a general-purpose place to store configuration variables
+			# The SECRET_KEY configuration variable is used as a general-purpose encryption key by Flask and several third-party extensions
+
+6. using Flask-WTF
+	create a Form class
+		from flask.ext.wtf import Form
+		from wtforms import StringField, SubmitField		# wtforms is a package
+		from wtforms.validators import Required
+
+		class NameForm(Form):
+		    name = StringField('What is your name?', validators=[Required()])
+		    submit = SubmitField('Submit')
+	handling forms in view functions
+		@app.route('/', methods=['GET', 'POST'])	# by default, the view function only handles GET requests
+		def index():
+		    name = None
+		    form = NameForm()
+		    if form.validate_on_submit():		# if all the validators return True
+			name = form.name.data
+			form.name.data = ''
+		    return render_template('index.html', form=form, name=name)
+	rendering forms in templates
+		you can give the field id or class attributes and then manually define CSS
+			<form method="POST">		
+			    {{ form.hidden_tag() }}		# hidden from view, used by Flask-WTF to implement CSRF protection
+			    {{ form.name.label }} {{ form.name(id='my-text-field') }}
+			    {{ form.submit() }}
+			</form>
+		or, Flask-Bootstrap provides a helper function that renders an entire Flask-WTF form
+			{% import "bootstrap/wtf.html" as wtf %}
+			{{ wtf.quick_form(form) }}
+
+	more
+		WTForms standard HTML fields
+			StringField		Text field
+			TextAreaField		Multiple-line text field
+			PasswordField		Password text field
+			HiddenField		Hidden text field
+			DateField		Text field that accepts a datetime.date value in a given format
+			DateTimeField		Text field that accepts a datetime.datetime value in a given format
+			IntegerField		Text field that accepts an integer value
+			DecimalField		Text field that accepts a decimal.Decimal value
+			FloatField		Text field that accepts a floating-point value
+			BooleanField		Checkbox with True and False values
+			RadioField		List of radio buttons
+			SelectField		Drop-down list of choices
+			SelectMultipleField	Drop-down list of choices with multiple selection
+			FileField		File upload field
+			SubmitField		Form submission button
+			FormField		Embed a form as a field in a container form
+			FieldList		List of fields of a given type
+		WTForms validators
+			Email		Validates an email address
+			EqualTo		Compares the values of two fields; useful when requesting a password to be entered twice for confirmation
+			IPAddress	Validates an IPv4 network address
+			Length		Validates the length of the string entered
+			NumberRange	Validates that the value entered is within a numeric range
+			Optional	Allows empty input on the field, skipping additional validators
+			Required	Validates that the field contains data
+			Regexp		Validates the input against a regular expression
+			URL		Validates a URL
+			AnyOf		Validates that the input is one of a list of possible values
+			NoneOf		Validates that the input is none of a list of possible values
+
+
+
