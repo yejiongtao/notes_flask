@@ -83,6 +83,11 @@
 
 		    def __repr__(self):				# not strictly necessary, just give a readable string representation that can be used for debugging
 			return '<User %r>' % self.username
+		# a best way to 
+
+
+
+
 	relationships
 
 
