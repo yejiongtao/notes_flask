@@ -98,6 +98,8 @@
 		many-to-one relationship can also be expressed as a one-to-many if the tables are reversed, 
 			or it can be expressed with the foreign key and the db.relationship() definition both on the “many” side
 		many-to-many, requires an additional table called an association table
+	operations
+		after configurations and definitions, just use the database in your code
 
 6. SQLAlchemy column types, and the Python type used in the model
 	Integer		int			Regular integer, typically 32 bits
