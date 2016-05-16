@@ -1,0 +1,164 @@
+1. large application structure	(checkout 7a)
+	Flask does not impose a specific organization for large projects
+		it's entirely up to the developer
+	organizing in packages and modules is a possible way
+basic structure
+	|-flasky
+	  |-app/
+	    |-templates/
+	    |-static/
+	    |-main/		# to host the blueprint
+	      |-__init__.py
+	      |-errors.py
+	      |-forms.py
+	      |-views.py
+	    |-__init__.py	# app package construtor, containing the factory function
+	    |-email.py		# email support functions
+	    |-models.py		# database models
+	  |-migrations/
+	  |-tests/
+	    |-__init__.py
+	    |-test*.py
+	  |-venv/		# virtual environment is necessary and important!
+	  |-requirements.txt	# lists the package dependencies so that it is easy to regenerate an identical virtual environment on a different computer
+	  |-config.py		# stores the configuration settings.
+	  |-manage.py		# launches the application and other application tasks.
+ 
+2. config.py example
+	# an app may need different configuration sets for different purposes, like development, testing, and production
+	import os
+	basedir = os.path.abspath(os.path.dirname(__file__))
+
+	class Config:				# base class, containing common configurations
+	    SECRET_KEY = os.environ.get('SECRET_KEY') or 'hard to guess string'		# have a default value in case the environment variable is not set
+	    SQLALCHEMY_COMMIT_ON_TEARDOWN = True
+	    FLASKY_MAIL_SUBJECT_PREFIX = '[Flasky]'
+	    FLASKY_MAIL_SENDER = 'Flasky Admin <flasky@example.com>'
+	    FLASKY_ADMIN = os.environ.get('FLASKY_ADMIN')
+
+	    @staticmethod
+	    def init_app(app):		# performs configuration-specific initialization
+		pass
+
+	class DevelopmentConfig(Config):
+	    DEBUG = True
+	    MAIL_SERVER = 'smtp.googlemail.com'
+	    MAIL_PORT = 587
+	    MAIL_USE_TLS = True
+	    MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
+	    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+	    SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URL') or \
+		'sqlite:///' + os.path.join(basedir, 'data-dev.sqlite')
+
+	class TestingConfig(Config):
+	    TESTING = True
+	    SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL') or \		# different database settings
+		'sqlite:///' + os.path.join(basedir, 'data-test.sqlite')
+
+	class ProductionConfig(Config):
+	    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+		'sqlite:///' + os.path.join(basedir, 'data.sqlite')
+
+	config = {
+	    'development': DevelopmentConfig,
+	    'testing': TestingConfig,
+	    'production': ProductionConfig,
+
+	    'default': DevelopmentConfig
+	}
+
+3. application package
+	factory function
+		in the single-script version, the app instance is created in the global scope, which is there when the script starts running
+			so we cannot designate configurations to be used
+		instead, we can create the app instance in a factory function, and pass the configuration as an argument
+			using factory, you can explicitly designate a configuration to use, and also can create multiple app instances
+		the factory function create_app(config_name) is usually implemented in the app package constructor, app/__init__.py
+			# app/__init__.py
+			from flask import Flask, render_template
+			from flask.ext.bootstrap import Bootstrap
+			from flask.ext.mail import Mail
+			from flask.ext.moment import Moment
+			from flask.ext.sqlalchemy import SQLAlchemy
+			from config import config
+
+			bootstrap = Bootstrap()		# creates the extensions uninitialized by passing no arguments into their constructors
+			mail = Mail()
+			moment = Moment()
+			db = SQLAlchemy()
+
+			def create_app(config_name):
+			    app = Flask(__name__)
+			    app.config.from_object(config[config_name])		# import the configurations defined in one of the classes
+			    config[config_name].init_app(app)
+
+			    bootstrap.init_app(app)				# initialize
+			    mail.init_app(app)
+			    moment.init_app(app)
+			    db.init_app(app)
+
+			    # attach routes and custom error pages here
+
+			    return app
+	blueprint
+		we cannot use @app.route and @app.errorhandler because the app instance is not in the global scope any more
+		Flask provides Blueprints, which are similar to application instances
+			using a global blueprint, routes can be defined
+			routes associated with a blueprint are in a dormant state until the blueprint is registered with an application
+		use a subpackage, i.e., here, main to host the blueprint
+		create a blueprint in the package constructor
+			# app/main/__init__.py
+			from flask import Blueprint
+			main = Blueprint('main', __name__)	# the first argument is the name of your blueprint
+								# the module or package where the blueprint is located, usually it's __name__
+			from . import views, errors		# import them at the bottom, to avoid circular dependency, because they also import the blueprint itself
+		register the blueprint in the factory function
+			# app/__init__.py
+			def create_app(config_name):
+			    # ...
+
+			    from .main import main as main_blueprint
+			    app.register_blueprint(main_blueprint)
+
+			    return app
+		implement errorhandlers
+			# app/main/errors.py
+			from flask import render_template
+			from . import main		# from the current package import the blueprint called 'main'
+
+			@main.app_errorhandler(404)	# use app_errorhandler, because main.errorhandler only deals with errors originate in the blueprint
+			def page_not_found(e):
+			    return render_template('404.html'), 404
+		implement view functions
+			# app/main/views.py
+			# ...
+			@main.route('/', methods=['GET', 'POST'])
+			def index():
+			    form = NameForm()
+			    if form.validate_on_submit():
+				# ...
+				return redirect(url_for('.index'))	# the endpoints in a blueprint has a namespace, which is the name of the blueprint
+									# main.index here
+									# inside blueprint, we can use '.index' for short
+
+4. manage.py: launch script
+	#!/usr/bin/env python	# a shebang line, designate the program used to run the script
+				# with it, in bash, you can execute it with ./manage.py, instead of python manage.py
+	import os
+	from app import create_app, db
+	from app.models import User, Role
+	from flask.ext.script import Manager, Shell
+	from flask.ext.migrate import Migrate, MigrateCommand
+
+	app = create_app(os.getenv('FLASK_CONFIG') or 'default')
+	manager = Manager(app)
+	migrate = Migrate(app, db)
+
+	def make_shell_context():
+	    return dict(app=app, db=db, User=User, Role=Role)
+	manager.add_command("shell", Shell(make_context=make_shell_context))
+	manager.add_command('db', MigrateCommand)
+
+	if __name__ == '__main__':
+	    manager.run()
+

@@ -1,0 +1,141 @@
+1. requirement file
+	generate a requirement file
+		$ pip freeze >requirements.txt
+	it's better to refresh the file whenever a package is intalled or upgraded
+	intall the packages based on the requirement file
+		$ pip install -r reqirement.txt
+
+2. unit tests
+	write test scripts
+		# tests/test_basics.py
+		import unittest				# using the the standard unittest package from the Python standard library
+		from flask import current_app
+		from app import create_app, db
+
+		class BasicsTestCase(unittest.TestCase):
+		    def setUp(self):			# setUp() runs before the test
+			self.app = create_app('testing')
+			self.app_context = self.app.app_context()	# activates its context to ensure that tests have access to current_app, like regular requests
+			self.app_context.push()
+			db.create_all()
+
+		    def tearDown(self):			# tearDown() runs after the test
+			db.session.remove()
+			db.drop_all()
+			self.app_context.pop()
+
+		    def test_app_exists(self):		# any methods that have a name that begins with test_ are executed as tests
+			self.assertFalse(current_app is None)
+
+		    def test_app_is_testing(self):
+			self.assertTrue(current_app.config['TESTING'])
+	make the tests package proper, by adding a tests/__init__.py file
+		but tests/__init__.py can be an empty file, as the unittest package can scan all the modules and locate the tests
+	run tests
+		add a custom command in manage.py
+			# manage.py
+			@manager.command		# add a custom command 'test'
+			def test():
+			    """Run the unit tests."""	# the function’s docstring is displayed in the help messages
+			    import unittest
+			    tests = unittest.TestLoader().discover('tests')
+			    unittest.TextTestRunner(verbosity=2).run(tests)
+		execute unit tests
+			$ python manage.py test
+
+3. user authentication
+	There are many Python authentication packages, but none of them do everything
+	we'll use the followings
+		Flask-Login: Management of user sessions for logged-in users
+		Werkzeug: Password hashing and verification
+		itsdangerous: Cryptographically secure token generation and verification
+
+4. password security
+	your server's database has the risk of being hacked in
+		for safety, store the hash of the password intead of the password itself into the database
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1. Rich Internet Application (RIA)
+	In RIAs, the server’s main (and sometimes only) function is to provide the client application with data retrieval and storage services
+		the server becomes a web service or Application Programming Interface (API).
+		the client side takes care of most of the business logic
+	several protocols by which RIAs can communicate with a web service
+		a few years ago
+			Remote Procedure Call (RPC) protocols such as XML-RPC 
+			or its derivative Simplified Object Access Protocol (SOAP)
+		most recently
+			the Representational State Transfer (REST) architecture
+				popular due to it being built on the familiar model of the World Wide Web
+			Flask is an ideal framework to build RESTful web services due to its lightweight nature
+
+2. introduction to REST
+	6 defining characteristic
+		Client-Server
+			There must be a clear separation between the clients and the server.
+		Stateless
+			A client request must contain all the information that is necessary to carry it out. The server must not store any state about the client that persists from one request to the next
+		Cache
+			Responses from the server can be labeled as cacheable or noncacheable so that clients (or intermediaries between clients and servers) can use a cache for optimization purposes
+		Uniform Interface
+			The protocol by which clients access server resources must be consistent, well defined, and standardized. The commonly used uniform interface of REST web services is the HTTP protocol
+		Layered System
+			Proxy servers, caches, or gateways can be inserted between clients and servers as necessary to improve performance, reliability, and scalability
+		Code-on-Demand
+			Clients can optionally download code from the server to execute in their context
+	The concept of resources is core to the REST architectural style
+		Each resource must have a unique URL that represents it
+		A collection of all the resources in a class also has an assigned URL
+		An API can also define collection URLs that represent logical subsets of all the resources in a class
+
+	HTTP request methods in RESTful APIs (request method, target, description, http status code)
+		GET	Individual resource URL		200	Obtain the resource.
+		GET	Resource collection URL		200	Obtain the collection of resources (or one page from it if the server implements pagination).
+		POST	Resource collection URL		201	Create a new resource and add it to the collection. The server chooses the URL of the new resource and returns it in a Location header in the response
+		PUT	Individual resource URL		200	Modify an existing resource. Alternatively this method can also be used to create a new resource when the client can choose the resource URL.
+		DELETE	Individual resource URL		200	Delete a resource.
+		DELETE	Resource collection URL		200	Delete all resources in the collection.
+	request and response bodies
+		REST does not specify the format to use to encode resources
+		The 'Content-Type' header in requests and responses is used to indicate the format in which a resource is encoded in the body
+		The standard content negotiation mechanisms in the HTTP protocol can be used between client and server to agree on a format that both support
+		Json and XML are commonly used
+			JSON is attractive because of its close ties to JavaScript
+	versioning
+		In a traditional server-centric web application, updation is just installing the new version on the server
+		but with RIAs and web services, APIs are used in different apps by different developers, updation becomes complicated
+			the common solution is to version the URLs, such as /api/v1.0/
+			and handles both old and new versions of URLs
+
+3. RESTful Web Services with Flask
+
+
+
+
+

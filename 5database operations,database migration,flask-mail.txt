@@ -1,0 +1,181 @@
+1. database operations
+	create tables
+		db.create_all()		# create databse based on the model classes, but will not re-create or update a table if it already exists
+		db.drop_all()		# delete database
+	insert rows
+		admin_role = Role(name = 'Admin')			# the primary key id is not set explicitly, primary keys are managed by Flask-SQLAlchemy
+		user_john = User(username = 'John', role = admin_role)
+
+		# a session is like a tracsaction, it contains things to be commit to the database
+		db.session.add(admin_role)
+		db.session.add(user_john)
+		# db.session.add_all([admin_role, user_john])
+
+		db.session.commit()
+		# sessions are  useful in keeping the database consistent
+		# If an error occurs while the session is being written, the whole session is discarded
+	modify rows
+		admin_role.name = 'Administrator'
+		db.session.add(admin_role)
+		db.session.commit()
+	delete rows
+		db.session.delete(admin_role)
+		db.session.commit()
+	query rows
+		each model has a query object
+			Role.query.all()	# all() is a executor, which triggers the execution of the query
+		filters can be used, they set restrictions to the original query object and return the refined query object
+			User.query.filter_by(role = admin_role).all()
+		get the SQL query generated for a given query
+			str(Role.query.all())
+	relationships
+		e.g., a one to many relationship
+			users = user_role.users		# from a Role object to the User objects
+			a_role = users[0].role		# from a User object to the Role object
+		actually, the user_role.users is a query, its executor is all(), but not shown
+			which arises a problem that we cannot apply other filters on it
+		to solve this, when we define the relationship, set the lazy attribute to be 'dynamic' to request the query not to be executed automatically
+			class Role(db.Model):
+			    # ...
+			    users = db.relationship('User', backref='role', lazy='dynamic')
+			    # ...
+			in this way, we explicitly call the executors
+				user_role.users.order_by(User.username).all()	
+				
+1.5. integration with the Python shell
+	the database creation should be done only if it's never been created
+	so the creation should not be with the codes that run every time
+	usually, we can use Shell to create the database on the first time
+		$ python hello.py shell
+		>>> from hello import db
+		>>> db.create
+	we can integrate some things in our code to save the import procedure
+		# in hello.py
+			from flask.ext.script import Shell
+
+			def make_shell_context():
+			    return dict(app=app, db=db, User=User, Role=Role)	# the left sides are the names to be used in shell
+										# the right sides are names in hello.py
+			manager.add_command("shell", Shell(make_context=make_shell_context))
+		in this way,
+			$ python hello.py shell
+			>>> db.create_all()
+
+2. Common SQLAlchemy query filters
+	filter()	Returns a new query that adds an additional filter to the original query
+	filter_by()	Returns a new query that adds an additional equality filter to the original query
+	limit()		Returns a new query that limits the number of results of the original query to the given number
+	offset()	Returns a new query that applies an offset into the list of results of the original query
+	order_by()	Returns a new query that sorts the results of the original query according to the given criteria
+	group_by()	Returns a new query that groups the results of the original query according to the given criteria
+
+Most common SQLAlchemy query executors
+	all()		Returns all the results of a query as a list
+	first()		Returns the first result of a query, or None if there are no results
+	first_or_404()	Returns the first result of a query, or aborts the request and sends a 404 error as response if there are no results
+	get()		Returns the row that matches the given primary key, or None if no matching row is found
+	get_or_404()	Returns the row that matches the given primary key. If the key is not found it aborts the request and sends a 404 error as response
+	count()		Returns the result count of the query
+	paginate()	Returns a Pagination object that contains the specified range of results
+
+3. database migration with Flask-Migrate
+	during development, models may need to change, and the database needs to be updated
+		the only to alter the database schema in SQLAlchemy is to drop_all() and then create_all()
+		but in this way the data will be gone
+	Database migration framework
+		it's like version control, it keeps track of changes to a database schema, and then incremental changes can be applied to the database
+		Alembic
+			a database migration framework written by SQLAlchemy's developers
+		Flask-Migrate
+			a lightweight Alembic wrapper that integrates with Flask-Script to provide all operations through Flask-Script commands
+	using Flask-Migrate
+		configuration
+			# inside hello.py
+			from flask.ext.migrate import Migrate, MigrateCommand
+			# ...
+
+			migrate = Migrate(app, db)
+			manager.add_command('db', MigrateCommand)	# 'db' is to be the command in shell, you can use any name
+		create a migration repository
+			$ python hello.py db init
+			# will create a migrations folder, containing all the migration scripts
+			# the migration scripts should always be added to version control along with the rest of the app
+		create a migration script  (similar to 'add' in git)
+			$ python hello.py db migrate -m "initial migration"
+			# the script will contain an upgrade() and a downgrade()
+		upgrade the database	(similar to 'commit' in git)
+			$ python hello.py db upgrade
+
+4. smtplib
+	Python's standard library, used to send email
+Flask-Mail
+	a Flask extension wraps smtplib
+	it connects to a SMTP server and sends email
+
+5.  using Flask-Mail
+	initialization
+		from flask.ext.mail import Mail
+		mail = Mail(app)
+	configuration
+		Flask-Mail SMTP server configuration keys and default values
+			MAIL_SERVER	localhost	Hostname or IP address of the email server
+			MAIL_PORT	25		Port of the email server
+			MAIL_USE_TLS	False		Enable Transport Layer Security (TLS) security
+			MAIL_USE_SSL	False		Enable Secure Sockets Layer (SSL) security
+			MAIL_USERNAME	None		Mail account username
+			MAIL_PASSWORD	None		Mail account password
+		example
+			import os
+			# ...
+			app.config['MAIL_SERVER'] = 'smtp.googlemail.com'
+			app.config['MAIL_PORT'] = 587
+			app.config['MAIL_USE_TLS'] = True
+			app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+			app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+		never write account credentials directly in your scripts
+			instead, import sensitive information from the environment
+		to set the environment variables
+			bash
+				export MAIL_USERNAME=<Gmail username>
+			Windows
+				set MAIL_USERNAME=<Gmail username>
+	sending email
+		define a method to do the job
+			from flask.ext.mail import Message
+
+			app.config['FLASKY_MAIL_SUBJECT_PREFIX'] = '[Flasky]'		
+			app.config['FLASKY_MAIL_SENDER'] = 'Flasky Admin <flasky@example.com>'
+
+			def send_email(to, subject, template, **kwargs):	# the 'template' name should be given without extension
+			    msg = Message(app.config['FLASKY_MAIL_SUBJECT_PREFIX'] + subject,
+					  sender=app.config['FLASKY_MAIL_SENDER'], recipients=[to])
+			    msg.body = render_template(template + '.txt', **kwargs)	# for plaine text
+			    msg.html = render_template(template + '.html', **kwargs)
+			    mail.send(msg)
+		define two templates for it, usually we create a subfolder mail inside folder templates
+			# mail/new_user.html
+				User <b> {{ user.username }} </b> has joined.
+			# mail/new_user.txt
+				User {{ user.username }} has joined.
+		call the method somewhere
+			send_email(app.config['FLASKY_ADMIN'], 'New User',
+				'mail/new_user', user=user)			# note the use of argumnets
+	sending asynchronous email
+		when sending the email, the page will be unresponsive, so it's better to send it in another thread
+			from threading import Thread
+
+			def send_async_email(app, msg):
+			    with app.app_context():
+				mail.send(msg)
+
+			def send_email(to, subject, template, **kwargs):
+			    msg = Message(app.config['FLASKY_MAIL_SUBJECT_PREFIX'] + subject,
+					  sender=app.config['FLASKY_MAIL_SENDER'], recipients=[to])
+			    msg.body = render_template(template + '.txt', **kwargs)
+			    msg.html = render_template(template + '.html', **kwargs)
+			    thr = Thread(target=send_async_email, args=[app, msg])	# you should send the app object as an argument as well
+			    thr.start()
+			    return thr
+		note the with app.app_context()
+			many Flask extensions need application contexts
+			in a different thread, the application context needs to be created artificially using app.app_context()
