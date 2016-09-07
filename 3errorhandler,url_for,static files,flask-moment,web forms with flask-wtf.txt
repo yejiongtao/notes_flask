@@ -89,13 +89,16 @@
 		    name = None
 		    form = NameForm()
 		    if form.validate_on_submit():		# if all the validators return True
+								# !!!! you can edit the form's column's attribute here! 
+								# from.name.validators=[..]
+								# useful if you want to show choices in SelectField based on other data
 			name = form.name.data
 			form.name.data = ''
 		    return render_template('index.html', form=form, name=name)
 	rendering forms in templates
 		you can give the field id or class attributes and then manually define CSS
 			<form method="POST">		
-			    {{ form.hidden_tag() }}		# hidden from view, used by Flask-WTF to implement CSRF protection
+			    {{ form.hidden_tag() }}		# hidden from view, used by Flask-WTF to implement CSRF protection 
 			    {{ form.name.label }} {{ form.name(id='my-text-field') }}
 			    {{ form.submit() }}
 			</form>

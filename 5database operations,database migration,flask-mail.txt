@@ -48,7 +48,7 @@
 	usually, we can use Shell to create the database on the first time
 		$ python hello.py shell
 		>>> from hello import db
-		>>> db.create
+		>>> db.create_all()
 	we can integrate some things in our code to save the import procedure
 		# in hello.py
 			from flask.ext.script import Shell
@@ -56,6 +56,8 @@
 			def make_shell_context():
 			    return dict(app=app, db=db, User=User, Role=Role)	# the left sides are the names to be used in shell
 										# the right sides are names in hello.py
+										# !!!! you must User=User, Role=Role!!!!!!
+										# otherwise no table will be found and created!!!
 			manager.add_command("shell", Shell(make_context=make_shell_context))
 		in this way,
 			$ python hello.py shell

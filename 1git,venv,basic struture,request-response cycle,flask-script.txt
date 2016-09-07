@@ -33,6 +33,7 @@
 	to use virtualenv
 		create
 			virtualenv venv			// create a virtual environment named venv, which will create a venv folder on the current directory
+			virtualenv -p python3 venv	// use python3 when both 2 and 3 exist
 		activate
 			source venv/bin/activate	// bash
 			venv\Scripts\activate		// Windows
